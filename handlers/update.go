@@ -6,7 +6,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 
 	"encoding/json"
 	"fmt"
@@ -29,20 +28,42 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 	// Create DynamoDB client
 	svc := dynamodb.New(sess)
 
-	// Getting id from path parameters
 	pathParamId := request.PathParameters["id"]
 
-	fmt.Println("Derived pathParamId from path params: ", pathParamId)
+	itemString := request.Body
+	itemStruct := Item{}
+	json.Unmarshal([]byte(itemString), &itemStruct)
 
-	// GetItem request
-	result, err := svc.GetItem(&dynamodb.GetItemInput{
+	info := Item{
+		Title:   itemStruct.Title,
+		Details: itemStruct.Details,
+	}
+
+	fmt.Println("Updating title to: ", info.Title)
+	fmt.Println("Updating details to: ", info.Details)
+
+	// Prepare input for Update Item
+	input := &dynamodb.UpdateItemInput{
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":t": {
+				S: aws.String(info.Title),
+			},
+			":d": {
+				S: aws.String(info.Details),
+			},
+		},
 		TableName: aws.String(os.Getenv("DYNAMODB_TABLE")),
 		Key: map[string]*dynamodb.AttributeValue{
 			"id": {
 				S: aws.String(pathParamId),
 			},
 		},
-	})
+		ReturnValues:     aws.String("UPDATED_NEW"),
+		UpdateExpression: aws.String("set title = :t, details = :d"),
+	}
+
+	// UpdateItem request
+	_, err := svc.UpdateItem(input)
 
 	// Checking for errors, return error
 	if err != nil {
@@ -50,28 +71,7 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 		return events.APIGatewayProxyResponse{StatusCode: 500}, nil
 	}
 
-	// Checking type
-	if len(result.Item) == 0 {
-		return events.APIGatewayProxyResponse{StatusCode: 404}, nil
-	}
-
-	// Created item of type Item
-	item := Item{}
-
-	// result is of type *dynamodb.GetItemOutput
-	// result.Item is of type map[string]*dynamodb.AttributeValue
-	// UnmarshallMap result.item into item
-	err = dynamodbattribute.UnmarshalMap(result.Item, &item)
-
-	if err != nil {
-		panic(fmt.Sprintf("Failed to UnmarshalMap result.Item: ", err))
-	}
-
-	// Marshal to type []uint8
-	marshalledItem, err := json.Marshal(item)
-
-	// Return marshalled item
-	return events.APIGatewayProxyResponse{Body: string(marshalledItem), StatusCode: 200}, nil
+	return events.APIGatewayProxyResponse{StatusCode: 204}, nil
 }
 
 func main() {

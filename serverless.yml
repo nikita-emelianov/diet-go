@@ -2,132 +2,96 @@ org: nikitaemelian
 app: diet-go
 service: diet-go
 
-# Welcome to Serverless!
-#
-# This file is the main config file for your service.
-# It's very minimal at this point and uses default values.
-# You can always add more config options for more control.
-# We've included some commented out config examples here.
-# Just uncomment any of them to get that config option.
-#
-# For full config options, check the docs:
-#    docs.serverless.com
-#
-# Happy Coding!
-
-# You can pin your service to only deploy with a specific Serverless version
-# Check out our docs for more details
+package:
+  individually: true
+  exclude:
+    - ./**
 
 provider:
   name: aws
   runtime: provided.al2023
+  environment:
+    DYNAMODB_TABLE: ${self:service}-${opt:stage, self:provider.stage}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE}"
   stage: prod
   region: eu-central-1
   architecture: arm64
 
-# you can add statements to the Lambda function's IAM Role here
-#  iam:
-#    role:
-#      statements:
-#        - Effect: "Allow"
-#          Action:
-#            - "s3:ListBucket"
-#          Resource: { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ] ]  }
-#        - Effect: "Allow"
-#          Action:
-#            - "s3:PutObject"
-#          Resource:
-#            Fn::Join:
-#              - ""
-#              - - "arn:aws:s3:::"
-#                - "Ref" : "ServerlessDeploymentBucket"
-#                - "/*"
-
-# you can define service wide environment variables here
-#  environment:
-#    variable1: value1
-
-package:
- individually: true
- exclude:
-   - ./**
-
 functions:
+  create:
+    handler: handler.create
+    package:
+      artifact: ./output/handlers/create.zip
+    events:
+      - http:
+          path: custom
+          method: post
+          cors: true
+
+  list:
+    handler: handler.list
+    package:
+      artifact: ./output/handlers/list.zip
+    events:
+      - http:
+          path: custom
+          method: get
+          cors: true
+
   get:
     handler: handler.get
     package:
       artifact: ./output/handlers/get.zip
     events:
       - http:
-          path: get/{name}
+          path: custom/{id}
           method: get
-          request:
-            parameter:
-              paths:
-                name: true
-  get_query:
-    handler: handler.get_query
+          cors: true
+
+  update:
+    handler: handler.update
     package:
-      artifact: ./output/handlers/get_query.zip
+      artifact: ./output/handlers/update.zip
     events:
       - http:
-          path: getQ
-          method: get
-          request:
-            parameters:
-              querystrings:
-                name: true
-  post:
-    handler: handler.post
+          path: custom/{id}
+          method: put
+          cors: true
+
+  delete:
+    handler: handler.delete
     package:
-      artifact: ./output/handlers/post.zip
+      artifact: ./output/handlers/delete.zip
     events:
       - http:
-          path: post
-          method: post
+          path: custom/{id}
+          method: delete
+          cors: true
 
-#    The following are a few example events you can configure
-#    NOTE: Please make sure to change your handler code to work with those events
-#    Check the event documentation for details
-# events:
-#    events:
-#      - http:
-#          path: users/create
-#          method: get
-#      - s3: ${env:BUCKET}
-#      - schedule: rate(10 minutes)
-#      - sns: greeter-topic
-#      - stream: arn:aws:dynamodb:region:XXXXXX:table/foo/stream/1970-01-01T00:00:00.000
-#      - alexaSkill: amzn1.ask.skill.xx-xx-xx-xx
-#      - alexaSmartHome: amzn1.ask.skill.xx-xx-xx-xx
-#      - iot:
-#          sql: "SELECT * FROM 'some_topic'"
-#      - cloudwatchEvent:
-#          event:
-#            source:
-#              - "aws.ec2"
-#            detail-type:
-#              - "EC2 Instance State-change Notification"
-#            detail:
-#              state:
-#                - pending
-#      - cloudwatchLog: '/aws/lambda/hello'
-#      - cognitoUserPool:
-#          pool: MyUserPool
-#          trigger: PreSignUp
-
-#    Define function environment variables here
-#    environment:
-#      variable2: value2
-
-# you can add CloudFormation resource templates here
-#resources:
-#  Resources:
-#    NewResource:
-#      Type: AWS::S3::Bucket
-#      Properties:
-#        BucketName: my-new-bucket
-#  Outputs:
-#     NewOutput:
-#       Description: "Description for the output"
-#       Value: "Some output value"
+resources:
+  Resources:
+    CustomDynamoDbTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.DYNAMODB_TABLE}
