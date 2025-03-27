@@ -1,90 +1,100 @@
 package main
 
 import (
-	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-	"github.com/google/uuid"
+    "context"
+    "encoding/json"
+    "fmt"
+    "os"
 
-	"encoding/json"
-	"fmt"
-	"os"
+    "github.com/aws/aws-lambda-go/events"
+    "github.com/aws/aws-lambda-go/lambda"
+    "github.com/aws/aws-sdk-go-v2/aws"
+    "github.com/aws/aws-sdk-go-v2/config"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+    "github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+    "github.com/google/uuid"
 )
 
 type Item struct {
-	Id      string `json:"id,omitempty"`
-	Title   string `json:"title"`
-	Details string `json:"details"`
+    Id      string `json:"id,omitempty"`
+    Title   string `json:"title"`
+    Details string `json:"details"`
 }
 
 func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+    // Create context
+    ctx := context.TODO()
 
-	// Creating session for client
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}))
+    // Load AWS configuration
+    cfg, err := config.LoadDefaultConfig(ctx)
+    if err != nil {
+        fmt.Println("Error loading AWS config:", err.Error())
+        return events.APIGatewayProxyResponse{StatusCode: 500}, nil
+    }
 
-	// Create DynamoDB client
-	svc := dynamodb.New(sess)
+    // Create DynamoDB client
+    svc := dynamodb.NewFromConfig(cfg)
 
-	// New uuid for item id
-	itemUuid := uuid.New().String()
+    // New uuid for item id
+    itemUuid := uuid.New().String()
+    fmt.Println("Generated new item uuid:", itemUuid)
 
-	fmt.Println("Generated new item uuid:", itemUuid)
+    // Unmarshal to Item to access object properties
+    itemString := request.Body
+    itemStruct := Item{}
+    err = json.Unmarshal([]byte(itemString), &itemStruct)
+    if err != nil {
+        fmt.Println("Error unmarshalling request:", err.Error())
+        return events.APIGatewayProxyResponse{StatusCode: 400, Body: "Invalid JSON"}, nil
+    }
 
-	// Unmarshal to Item to access object properties
-	itemString := request.Body
-	itemStruct := Item{}
-	json.Unmarshal([]byte(itemString), &itemStruct)
+    if itemStruct.Title == "" {
+        return events.APIGatewayProxyResponse{StatusCode: 400}, nil
+    }
 
-	if itemStruct.Title == "" {
-		return events.APIGatewayProxyResponse{StatusCode: 400}, nil
-	}
+    // Create new item
+    item := Item{
+        Id:      itemUuid,
+        Title:   itemStruct.Title,
+        Details: itemStruct.Details,
+    }
 
-	// Create new item of type item
-	item := Item{
-		Id:      itemUuid,
-		Title:   itemStruct.Title,
-		Details: itemStruct.Details,
-	}
+    // Marshal to dynamodb item
+    av, err := attributevalue.MarshalMap(item)
+    if err != nil {
+        fmt.Println("Error marshalling item:", err.Error())
+        return events.APIGatewayProxyResponse{StatusCode: 500}, nil
+    }
 
-	// Marshal to dynamobb item
-	av, err := dynamodbattribute.MarshalMap(item)
-	if err != nil {
-		fmt.Println("Error marshalling item: ", err.Error())
-		return events.APIGatewayProxyResponse{StatusCode: 500}, nil
-	}
+    tableName := os.Getenv("DYNAMODB_TABLE")
 
-	tableName := os.Getenv("DYNAMODB_TABLE")
+    // Build put item input
+    fmt.Printf("Putting item: %v\n", av)
+    input := &dynamodb.PutItemInput{
+        Item:      av,
+        TableName: aws.String(tableName),
+    }
 
-	// Build put item input
-	fmt.Println("Putting item: %v", av)
-	input := &dynamodb.PutItemInput{
-		Item:      av,
-		TableName: aws.String(tableName),
-	}
+    // PutItem request
+    _, err = svc.PutItem(ctx, input)
 
-	// PutItem request
-	_, err = svc.PutItem(input)
+    // Checking for errors
+    if err != nil {
+        fmt.Println("Got error calling PutItem:", err.Error())
+        return events.APIGatewayProxyResponse{StatusCode: 500}, nil
+    }
 
-	// Checking for errors, return error
-	if err != nil {
-		fmt.Println("Got error calling PutItem: ", err.Error())
-		return events.APIGatewayProxyResponse{StatusCode: 500}, nil
-	}
+    // Marshal item to return
+    itemMarshalled, err := json.Marshal(item)
+    fmt.Println("Returning item:", string(itemMarshalled))
 
-	// Marshal item to return
-	itemMarshalled, err := json.Marshal(item)
-
-	fmt.Println("Returning item: ", string(itemMarshalled))
-
-	//Returning response with AWS Lambda Proxy Response
-	return events.APIGatewayProxyResponse{Body: string(itemMarshalled), StatusCode: 200}, nil
+    // Returning response
+    return events.APIGatewayProxyResponse{
+        Body:       string(itemMarshalled),
+        StatusCode: 200,
+    }, nil
 }
 
 func main() {
-	lambda.Start(Handler)
+    lambda.Start(Handler)
 }

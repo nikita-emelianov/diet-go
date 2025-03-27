@@ -1,79 +1,85 @@
 package main
 
 import (
-	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+    "context"
+    "encoding/json"
+    "fmt"
+    "os"
 
-	"encoding/json"
-	"fmt"
-	"os"
+    "github.com/aws/aws-lambda-go/events"
+    "github.com/aws/aws-lambda-go/lambda"
+    "github.com/aws/aws-sdk-go-v2/aws"
+    "github.com/aws/aws-sdk-go-v2/config"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+    "github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 type Item struct {
-	Id      string `json:"id,omitempty"`
-	Title   string `json:"title"`
-	Details string `json:"details"`
+    Id      string `json:"id,omitempty"`
+    Title   string `json:"title"`
+    Details string `json:"details"`
 }
 
 func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+    // Create context
+    ctx := context.TODO()
 
-	// Creating session for client
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}))
+    // Load AWS configuration
+    cfg, err := config.LoadDefaultConfig(ctx)
+    if err != nil {
+        fmt.Println("Error loading AWS config:", err.Error())
+        return events.APIGatewayProxyResponse{StatusCode: 500}, nil
+    }
 
-	// Create DynamoDB client
-	svc := dynamodb.New(sess)
+    // Create DynamoDB client
+    svc := dynamodb.NewFromConfig(cfg)
 
-	// Getting id from path parameters
-	pathParamId := request.PathParameters["id"]
+    // Getting id from path parameters
+    pathParamId := request.PathParameters["id"]
 
-	fmt.Println("Derived pathParamId from path params: ", pathParamId)
+    fmt.Println("Derived pathParamId from path params:", pathParamId)
 
-	// GetItem request
-	result, err := svc.GetItem(&dynamodb.GetItemInput{
-		TableName: aws.String(os.Getenv("DYNAMODB_TABLE")),
-		Key: map[string]*dynamodb.AttributeValue{
-			"id": {
-				S: aws.String(pathParamId),
-			},
-		},
-	})
+    // GetItem request
+    result, err := svc.GetItem(ctx, &dynamodb.GetItemInput{
+        TableName: aws.String(os.Getenv("DYNAMODB_TABLE")),
+        Key: map[string]types.AttributeValue{
+            "id": &types.AttributeValueMemberS{Value: pathParamId},
+        },
+    })
 
-	// Checking for errors, return error
-	if err != nil {
-		fmt.Println(err.Error())
-		return events.APIGatewayProxyResponse{StatusCode: 500}, nil
-	}
+    // Checking for errors, return error
+    if err != nil {
+        fmt.Println(err.Error())
+        return events.APIGatewayProxyResponse{StatusCode: 500}, nil
+    }
 
-	// Checking type
-	if len(result.Item) == 0 {
-		return events.APIGatewayProxyResponse{StatusCode: 404}, nil
-	}
+    // Checking if item exists
+    if result.Item == nil || len(result.Item) == 0 {
+        return events.APIGatewayProxyResponse{StatusCode: 404}, nil
+    }
 
-	// Created item of type Item
-	item := Item{}
+    // Created item of type Item
+    item := Item{}
 
-	// result is of type *dynamodb.GetItemOutput
-	// result.Item is of type map[string]*dynamodb.AttributeValue
-	// UnmarshallMap result.item into item
-	err = dynamodbattribute.UnmarshalMap(result.Item, &item)
+    // Unmarshal result.Item into item
+    err = attributevalue.UnmarshalMap(result.Item, &item)
 
-	if err != nil {
-		panic(fmt.Sprintf("Failed to UnmarshalMap result.Item: ", err))
-	}
+    if err != nil {
+        fmt.Printf("Failed to UnmarshalMap result.Item: %v\n", err)
+        return events.APIGatewayProxyResponse{StatusCode: 500}, nil
+    }
 
-	// Marshal to type []uint8
-	marshalledItem, err := json.Marshal(item)
+    // Marshal to JSON
+    marshalledItem, err := json.Marshal(item)
+    if err != nil {
+        return events.APIGatewayProxyResponse{StatusCode: 500}, nil
+    }
 
-	// Return marshalled item
-	return events.APIGatewayProxyResponse{Body: string(marshalledItem), StatusCode: 200}, nil
+    // Return marshalled item
+    return events.APIGatewayProxyResponse{Body: string(marshalledItem), StatusCode: 200}, nil
 }
 
 func main() {
-	lambda.Start(Handler)
+    lambda.Start(Handler)
 }

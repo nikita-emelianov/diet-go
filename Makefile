@@ -8,13 +8,12 @@ build: clean
 	mkdir -p ./output/handlers
 	mkdir -p ./output/tmp
 
-	# Build executables and place them directly at the root of each function directory
-	env GOARCH=arm64 GOOS=linux
-	go build -ldflags="-s -w" -o ./output/tmp/create handlers/create.go
-	go build -ldflags="-s -w" -o ./output/tmp/delete handlers/delete.go
-	go build -ldflags="-s -w" -o ./output/tmp/get handlers/get.go
-	go build -ldflags="-s -w" -o ./output/tmp/list handlers/list.go
-	go build -ldflags="-s -w" -o ./output/tmp/update handlers/update.go
+	# Build executables for Lambda
+	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ./output/tmp/create handlers/create.go
+	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ./output/tmp/delete handlers/delete.go
+	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ./output/tmp/get handlers/get.go
+	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ./output/tmp/list handlers/list.go
+	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ./output/tmp/update handlers/update.go
 
 	# Create deployment packages (zip files)
 	cp ./output/tmp/create ./output/tmp/bootstrap && (cd ./output/tmp && zip -m ../handlers/create.zip bootstrap)
