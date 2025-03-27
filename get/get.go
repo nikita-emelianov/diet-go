@@ -14,7 +14,7 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 	name := request.PathParameters["name"]
 
 	//Generate message that want to be sent as body
-	message := fmt.Sprintf(" { \"Message\" : \"Hello %s \" } ", name)
+	message := fmt.Sprintf(" { \"Message\" : \"v2 Hello %s \" } ", name)
 
 	//Returning response with AWS Lambda Proxy Response
 	return events.APIGatewayProxyResponse{Body: message, StatusCode: 200}, nil
