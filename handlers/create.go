@@ -29,7 +29,7 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
     cfg, err := config.LoadDefaultConfig(ctx)
     if err != nil {
         fmt.Println("Error loading AWS config:", err.Error())
-        return events.APIGatewayProxyResponse{StatusCode: 500}, nil
+        return events.APIGatewayProxyResponse{StatusCode: 500, Body: "Error loading AWS config"}, nil
     }
 
     // Create DynamoDB client
@@ -49,7 +49,7 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
     }
 
     if itemStruct.Title == "" {
-        return events.APIGatewayProxyResponse{StatusCode: 400}, nil
+        return events.APIGatewayProxyResponse{StatusCode: 400, Body: "Title is required"}, nil
     }
 
     // Create new item
@@ -63,13 +63,17 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
     av, err := attributevalue.MarshalMap(item)
     if err != nil {
         fmt.Println("Error marshalling item:", err.Error())
-        return events.APIGatewayProxyResponse{StatusCode: 500}, nil
+        return events.APIGatewayProxyResponse{StatusCode: 500, Body: "Error marshalling item"}, nil
     }
 
     tableName := os.Getenv("DYNAMODB_TABLE")
+    if tableName == "" {
+        fmt.Println("DYNAMODB_TABLE environment variable not set")
+        return events.APIGatewayProxyResponse{StatusCode: 500, Body: "Missing table configuration"}, nil
+    }
 
     // Build put item input
-    fmt.Printf("Putting item: %v\n", av)
+    fmt.Printf("Putting item to table %s: %v\n", tableName, av)
     input := &dynamodb.PutItemInput{
         Item:      av,
         TableName: aws.String(tableName),
@@ -81,11 +85,15 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
     // Checking for errors
     if err != nil {
         fmt.Println("Got error calling PutItem:", err.Error())
-        return events.APIGatewayProxyResponse{StatusCode: 500}, nil
+        return events.APIGatewayProxyResponse{StatusCode: 500, Body: "Error saving item to database"}, nil
     }
 
     // Marshal item to return
     itemMarshalled, err := json.Marshal(item)
+    if err != nil {
+        fmt.Println("Error marshalling response:", err.Error())
+        return events.APIGatewayProxyResponse{StatusCode: 500, Body: "Error creating response"}, nil
+    }
     fmt.Println("Returning item:", string(itemMarshalled))
 
     // Returning response
