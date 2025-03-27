@@ -75,7 +75,11 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
     // Build put item input
     fmt.Printf("Putting item to table %s: %v\n", tableName, av)
     input := &dynamodb.PutItemInput{
-        Item:      av,
+        Item: map[string]types.AttributeValue{
+            "id":      &types.AttributeValueMemberS{Value: itemUuid},
+            "title":   &types.AttributeValueMemberS{Value: item.Title},
+            "details": &types.AttributeValueMemberS{Value: item.Details},
+        },
         TableName: aws.String(tableName),
     }
 
@@ -84,8 +88,8 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 
     // Checking for errors
     if err != nil {
-        fmt.Println("Got error calling PutItem:", err.Error())
-        return events.APIGatewayProxyResponse{StatusCode: 500, Body: "Error saving item to database"}, nil
+        fmt.Printf("Got error calling PutItem: %v\n", err)
+        return events.APIGatewayProxyResponse{StatusCode: 500, Body: fmt.Sprintf("Error saving item to database: %v", err)}, nil
     }
 
     // Marshal item to return
