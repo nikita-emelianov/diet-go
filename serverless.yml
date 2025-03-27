@@ -56,7 +56,7 @@ functions:
   get:
     handler: handler.get
     package:
-      artifact: ./output/get/get.zip
+      artifact: ./output/handlers/get.zip
     events:
       - http:
           path: get/{name}
@@ -65,10 +65,10 @@ functions:
             parameter:
               paths:
                 name: true
-  getquery:
-    handler: handler.getquery
+  get_query:
+    handler: handler.get_query
     package:
-      artifact: ./output/getquery/getquery.zip
+      artifact: ./output/handlers/get_query.zip
     events:
       - http:
           path: getQ
@@ -80,7 +80,7 @@ functions:
   post:
     handler: handler.post
     package:
-      artifact: ./output/post/post.zip
+      artifact: ./output/handlers/post.zip
     events:
       - http:
           path: post
