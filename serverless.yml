@@ -28,22 +28,7 @@ provider:
   region: eu-central-1
   architecture: arm64
   httpApi:
-    cors:
-      origin: '*'
-      allowedHeaders:
-        - Content-Type
-        - Authorization
-        - X-Api-Key
-        - X-Amz-Date
-        - X-Amz-Security-Token
-      allowedMethods:
-        - GET
-        - POST
-        - PUT
-        - DELETE
-        - OPTIONS
-      allowCredentials: false
-      maxAge: 86400
+    cors: true
 
 functions:
   create:
@@ -51,50 +36,45 @@ functions:
     package:
       artifact: ./output/handlers/create.zip
     events:
-      - http:
-          path: custom
-          method: post
-          cors: ${self:provider.httpApi.cors}
+      - httpApi:
+          method: POST
+          path: /custom
 
   list:
     handler: handler.list
     package:
       artifact: ./output/handlers/list.zip
     events:
-      - http:
-          path: custom
-          method: get
-          cors: ${self:provider.httpApi.cors}
+      - httpApi:
+          method: GET
+          path: /custom
 
   get:
     handler: handler.get
     package:
       artifact: ./output/handlers/get.zip
     events:
-      - http:
-          path: custom/{id}
-          method: get
-          cors: ${self:provider.httpApi.cors}
+      - httpApi:
+          method: GET
+          path: /custom/{id}
 
   update:
     handler: handler.update
     package:
       artifact: ./output/handlers/update.zip
     events:
-      - http:
-          path: custom/{id}
-          method: put
-          cors: ${self:provider.httpApi.cors}
+      - httpApi:
+          method: PUT
+          path: /custom/{id}
 
   delete:
     handler: handler.delete
     package:
       artifact: ./output/handlers/delete.zip
     events:
-      - http:
-          path: custom/{id}
-          method: delete
-          cors: ${self:provider.httpApi.cors}
+      - httpApi:
+          method: DELETE
+          path: /custom/{id}
 
 resources:
   Resources:
