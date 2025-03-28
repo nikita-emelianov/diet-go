@@ -29,8 +29,18 @@ provider:
   architecture: arm64
   httpApi:
     cors: true
+  authorizer:
+    name: authorizer
+    type: request
 
 functions:
+  authorizer:
+    handler: handler.authorizer
+    package:
+      artifact: ./output/handlers/authorizer.zip
+    environment:
+      AUTH_TOKEN: ${env:AUTH_TOKEN}
+
   create:
     handler: handler.create
     package:

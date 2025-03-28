@@ -14,6 +14,7 @@ build: clean
 	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ./output/tmp/get handlers/get.go
 	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ./output/tmp/list handlers/list.go
 	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ./output/tmp/update handlers/update.go
+	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ./output/tmp/authorizer handlers/authorizer.go
 
 	# Create deployment packages (zip files)
 	cp ./output/tmp/create ./output/tmp/bootstrap && (cd ./output/tmp && zip -m ../handlers/create.zip bootstrap)
@@ -21,6 +22,7 @@ build: clean
 	cp ./output/tmp/get ./output/tmp/bootstrap && (cd ./output/tmp && zip -m ../handlers/get.zip bootstrap)
 	cp ./output/tmp/list ./output/tmp/bootstrap && (cd ./output/tmp && zip -m ../handlers/list.zip bootstrap)
 	cp ./output/tmp/update ./output/tmp/bootstrap && (cd ./output/tmp && zip -m ../handlers/update.zip bootstrap)
+	cp ./output/tmp/authorizer ./output/tmp/bootstrap && (cd ./output/tmp && zip -m ../handlers/authorizer.zip bootstrap)
 
 deploy: build
 	sls deploy --verbose
